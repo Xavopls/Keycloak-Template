@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+#  mongodb:
+#    image: 'mongo:latest'
+#    env_file:
+#      - .env
+#    environment:
+#      - MONGO_INITDB_DATABASE = ${MONGO_DATABASE}
+#      - MONGO_INITDB_ROOT_USERNAME = ${MONGO_USERNAME}
+#      - MONGO_INITDB_ROOT_PASSWORD = ${MONGO_PASSWORD}
+#    healthcheck:
+#      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+#    ports:
+#      - '27017'
+#
+#  spring-boot-sa:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile-app
+#    container_name: spring-boot-sa
+#    env_file:
+#      - .env
+#    depends_on:
+#      mongodb:
+#        condition: service_healthy
+
+  keycloak:
+    image: keycloak/keycloak:latest
+    env_file:
+      - .env
+    restart: always
+    environment:
+       KC_HEALTH_ENABLED: ${KEYCLOAK_HEALTH_ENABLED}
+       KC_METRICS_ENABLED: ${KEYCLOAK_METRICS_ENABLED}
+       KC_HTTP_PORT: ${KEYCLOAK_HTTP_PORT}
+       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+       KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+       KC_DB: postgres
+       KC_DB_URL: jdbc:postgresql://${KEYCLOAK_DB_CONTAINER}:${KEYCLOAK_DB_PORT}/${KEYCLOAK_DATABASE}
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    command: start-dev
+    ports:
+      - '${KEYCLOAK_HTTP_PORT}:8080'
+
+  keycloak-db:
+    image: postgres:latest
+    env_file: .env
+    restart: always
+    volumes:
+      - keycloak-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${KEYCLOAK_DB_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      POSTGRES_DB: ${KEYCLOAK_DATABASE}
+      PGPORT: ${KEYCLOAK_DB_PORT}
+      PGUSER: ${KEYCLOAK_DB_USER}
+    ports:
+      - '${KEYCLOAK_DB_PORT}:5432'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d ${KEYCLOAK_DATABASE} -U ${KEYCLOAK_DB_USER}"]
+      interval: 5s
+      timeout: 60s
+      retries: 12
+      start_period: 80s
+
+volumes:
+  keycloak-data:
